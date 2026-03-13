@@ -72,10 +72,10 @@ If you need to make changes (e.g., add a new program, update the password, or ch
 Open `Index.html` and find this line near the top:
 
 ```javascript
-var ACCESS_PASSWORD = "EOimpact2025";
+var ACCESS_PASSWORD = "thepassword";
 ```
 
-Replace `EOimpact2025` with your new password and commit the change.
+Replace `the password` with your new password and commit the change.
 
 ---
 
