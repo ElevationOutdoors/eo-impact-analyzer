@@ -9,10 +9,89 @@
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f4; min-height: 100vh; }
     @media print { body { background: white; } .no-print { display: none !important; } }
     select option { color: #000; }
+
+    /* ── PASSWORD GATE ── */
+    #pw-gate {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #f4f7f4;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #pw-box {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.12);
+      padding: 48px 40px 40px;
+      max-width: 380px; width: 90%;
+      text-align: center;
+    }
+    #pw-box .pw-logo {
+      font-size: 36px; margin-bottom: 12px;
+    }
+    #pw-box h2 {
+      color: #2d7a4f; font-size: 20px; font-weight: 700; margin-bottom: 6px;
+    }
+    #pw-box p {
+      color: #666; font-size: 14px; margin-bottom: 28px;
+    }
+    #pw-input {
+      width: 100%; padding: 12px 14px; border: 2px solid #cde;
+      border-radius: 8px; font-size: 16px; outline: none;
+      margin-bottom: 14px; transition: border 0.2s;
+    }
+    #pw-input:focus { border-color: #2d7a4f; }
+    #pw-btn {
+      width: 100%; padding: 13px; background: #2d7a4f; color: #fff;
+      border: none; border-radius: 8px; font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: background 0.2s;
+    }
+    #pw-btn:hover { background: #235f3d; }
+    #pw-error {
+      color: #e05a5a; font-size: 13px; margin-top: 10px;
+      min-height: 18px;
+    }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+
+  <!-- PASSWORD GATE (shown first; hidden on correct password) -->
+  <div id="pw-gate">
+    <div id="pw-box">
+      <div class="pw-logo">🏔️</div>
+      <h2>Elevation Outdoors</h2>
+      <p>Program Impact Analyzer<br>Enter your access password to continue.</p>
+      <input id="pw-input" type="password" placeholder="Password" autocomplete="current-password" />
+      <button id="pw-btn" onclick="checkPassword()">Enter</button>
+      <div id="pw-error"></div>
+    </div>
+  </div>
+
+  <script>
+    // ── Change the password here ──────────────────────────────────────
+    var ACCESS_PASSWORD = "EOimpact2025";
+    // ─────────────────────────────────────────────────────────────────
+
+    function checkPassword() {
+      var entered = document.getElementById("pw-input").value;
+      if (entered === ACCESS_PASSWORD) {
+        document.getElementById("pw-gate").style.display = "none";
+        document.getElementById("root").style.display = "block";
+      } else {
+        var err = document.getElementById("pw-error");
+        err.textContent = "Incorrect password. Please try again.";
+        document.getElementById("pw-input").value = "";
+        document.getElementById("pw-input").focus();
+      }
+    }
+
+    // Allow pressing Enter key to submit
+    document.addEventListener("DOMContentLoaded", function() {
+      document.getElementById("pw-input").addEventListener("keydown", function(e) {
+        if (e.key === "Enter") checkPassword();
+      });
+    });
+  </script>
+
+  <div id="root" style="display:none;"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
