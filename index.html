@@ -638,13 +638,18 @@
         const allDoms = new Set(pd.flatMap(y=>Object.keys(y.domainScores||{})));
         const domainScores = {};
         allDoms.forEach(k=>{
-          // Build weighted pre/post value arrays across all years
+          // Weighted average of pre/post scores across years (weighted by participant count)
           const preVals  = pd.flatMap(y=>{ const s=y.domainScores?.[k]; return s?.pre!=null  ? Array(Math.max(1,y.nPre||1)).fill(s.pre)  : []; });
           const postVals = pd.flatMap(y=>{ const s=y.domainScores?.[k]; return s?.post!=null ? Array(Math.max(1,y.nPost||1)).fill(s.post) : []; });
-          const preAvg   = avg(preVals);
-          const postAvg  = avg(postVals);
-          const pctImproved = preAvg!=null && postVals.length>0
-            ? pct(postVals.filter(v=>v>preAvg).length, postVals.length) : null;
+          const preAvg  = avg(preVals);
+          const postAvg = avg(postVals);
+          // pctImproved: weighted average of each year's pctImproved (weighted by nPost)
+          // This avoids the 100% bug caused by comparing identical repeated averages
+          const yearsWithPct = pd.filter(y=>y.domainScores?.[k]?.pctImproved!=null);
+          const totalPost = yearsWithPct.reduce((s,y)=>s+(y.nPost||1),0);
+          const pctImproved = yearsWithPct.length>0
+            ? Math.round(yearsWithPct.reduce((s,y)=>s+y.domainScores[k].pctImproved*(y.nPost||1),0) / totalPost)
+            : null;
           domainScores[k] = { pre: preAvg, post: postAvg, pctImproved };
         });
         const wavg = key => { const vs=pd.filter(y=>y[key]!=null); return vs.length ? +(vs.reduce((s,y)=>s+y[key],0)/vs.length).toFixed(1) : null; };
