@@ -629,8 +629,50 @@
       const cancelRef  = useRef(false);
       const logEndRef  = useRef(null);
 
-      const progData = allData[program]||[];
-      const allYears = progData.map(y=>y.year);
+      const isAllProgs = program==="all";
+      const progData   = isAllProgs ? [] : (allData[program]||[]);
+      const allYears   = isAllProgs
+        ? [...new Set(Object.values(allData).flatMap(pd=>pd.map(y=>y.year)))].sort()
+        : progData.map(y=>y.year);
+
+      // ── ALL PROGRAMS COMBINED AGGREGATION ────────────────────────
+      function combinePrograms(allData, yearFilter) {
+        const programYears = {};
+        for (const [key, pd] of Object.entries(allData)) {
+          const yrs = yearFilter==="All Time" ? pd : pd.filter(y=>y.year===yearFilter);
+          if (!yrs.length) continue;
+          programYears[key] = yrs.length===1 ? yrs[0] : aggregateAllTime(yrs);
+        }
+        const allPY = Object.values(programYears);
+        if (!allPY.length) return { combined:{}, perProgram:{} };
+        const allDoms = new Set(allPY.flatMap(y=>Object.keys(y.domainScores||{})));
+        const domainScores = {};
+        allDoms.forEach(k=>{
+          const preVals  = allPY.flatMap(y=>{ const s=y.domainScores?.[k]; return s?.pre!=null  ? Array(Math.max(1,y.nPre||1)).fill(s.pre)  : []; });
+          const postVals = allPY.flatMap(y=>{ const s=y.domainScores?.[k]; return s?.post!=null ? Array(Math.max(1,y.nPost||1)).fill(s.post) : []; });
+          const withPct  = allPY.filter(y=>y.domainScores?.[k]?.pctImproved!=null);
+          const totPost  = withPct.reduce((s,y)=>s+(y.nPost||1),0);
+          const pctImproved = withPct.length>0
+            ? Math.round(withPct.reduce((s,y)=>s+y.domainScores[k].pctImproved*(y.nPost||1),0)/totPost) : null;
+          domainScores[k] = { pre:avg(preVals), post:avg(postVals), pctImproved };
+        });
+        const wavg = key => { const vs=allPY.filter(y=>y[key]!=null); return vs.length ? +(vs.reduce((s,y)=>s+y[key],0)/vs.length).toFixed(1) : null; };
+        return {
+          combined: {
+            year: yearFilter, nPre: allPY.reduce((s,y)=>s+(y.nPre||0),0), nPost: allPY.reduce((s,y)=>s+(y.nPost||0),0),
+            domainScores,
+            preRelPeer: wavg("preRelPeer"), postRelPeer: wavg("postRelPeer"),
+            preRelAdult: wavg("preRelAdult"), postRelAdult: wavg("postRelAdult"),
+            madeFriendPct: wavg("madeFriendPct"), avgBelonging: wavg("avgBelonging"),
+            accessNoPct: wavg("accessNoPct"), accessUnsurePct: wavg("accessUnsurePct"),
+            newToProgramPct: wavg("newToProgramPct"),
+            avgRating: wavg("avgRating"), highRatingPct: wavg("highRatingPct"),
+            feltSafePct: wavg("feltSafePct"), leaderSafePct: wavg("leaderSafePct"),
+            quotes: allPY.flatMap(y=>y.quotes||[]),
+          },
+          perProgram: programYears,
+        };
+      }
 
       // ── ALL TIME AGGREGATION ──────────────────────────────────────
       function aggregateAllTime(pd) {
@@ -669,9 +711,18 @@
         };
       }
 
-      const yr = selYear==="All Time"
-        ? aggregateAllTime(progData)
-        : (progData.find(y=>y.year===selYear)||progData[progData.length-1]||{});
+      const _allProgCombined = isAllProgs ? combinePrograms(allData, selYear) : null;
+      const perProgramYr     = _allProgCombined?.perProgram || {};
+      const yr = isAllProgs
+        ? (_allProgCombined?.combined || {})
+        : selYear==="All Time"
+          ? aggregateAllTime(progData)
+          : (progData.find(y=>y.year===selYear)||progData[progData.length-1]||{});
+      // For the Trends tab: per-year combined objects when viewing all programs
+      const trendData = isAllProgs
+        ? allYears.map(y=>combinePrograms(allData,y).combined)
+        : progData;
+      const progLabel = isAllProgs ? "All Programs" : (PROGRAMS[program]?.label||"");
 
       function setResults(data, demo=false) {
         setAllData(data); setIsDemo(demo);
@@ -1075,6 +1126,18 @@
             </div>
             <div style={{display:"flex",gap:6,marginTop:12,flexWrap:"wrap",alignItems:"center"}}>
               <span style={{fontSize:12,opacity:.85}}>Program:</span>
+              {Object.keys(allData).length>1&&(
+                <button onClick={()=>{
+                  setProgram("all");
+                  const ys=[...new Set(Object.values(allData).flatMap(pd=>pd.map(y=>y.year)))].sort();
+                  setSelYear(ys[ys.length-1]||null); setTab("📊 Overview");
+                }} style={{fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:10,border:"none",cursor:"pointer",
+                  background:program==="all"?"#fff":"rgba(255,255,255,.3)",
+                  color:program==="all"?C.G:"#fff",
+                  boxShadow:program==="all"?"0 0 0 2px "+C.G:"none"}}>
+                  🌐 All Programs
+                </button>
+              )}
               {Object.entries(PROGRAMS).filter(([k])=>allData[k]).map(([k,p])=>(
                 <button key={k} onClick={()=>{setProgram(k);const ys=(allData[k]||[]).map(y=>y.year);setSelYear(ys[ys.length-1]||null);setTab("📊 Overview");}}
                   style={{fontSize:11,fontWeight:600,padding:"4px 10px",borderRadius:10,border:"none",cursor:"pointer",
@@ -1097,7 +1160,7 @@
 
           {tab==="📊 Overview"&&(
             <>
-              <Sec title={`${PROGRAMS[program]?.label} — ${selYear} (pre n=${yr.nPre||"—"}, post n=${yr.nPost||"—"})`}>
+              <Sec title={`${progLabel} — ${selYear} (pre n=${yr.nPre||"—"}, post n=${yr.nPost||"—"})`}>
                 <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
                   <Card label="Avg Program Rating"    value={yr.avgRating?`${fmtR(yr.avgRating)}/10`:"—"} accent={C.G}/>
                   <Card label="Made New Friends"       value={yr.madeFriendPct!=null?`${yr.madeFriendPct}%`:"—"} accent={C.T}/>
@@ -1116,7 +1179,7 @@
           )}
 
           {tab==="🎯 Outcome Domains"&&(
-            <Sec title={`Outcome Domains — ${PROGRAMS[program]?.label} · ${selYear}`}>
+            <Sec title={`Outcome Domains — ${progLabel} · ${selYear}`}>
               <div style={{background:"#f0f6ff",border:"1px solid #c5d8f5",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#3a5a8a",lineHeight:1.7}}>
                 <strong>How to read these results:</strong> <em>Pre</em> and <em>Post</em> scores are group averages on a 1–7 scale.
                 The <strong style={{color:C.G}}>+% change</strong> badge shows how much the average score improved from pre to post survey.
@@ -1155,6 +1218,26 @@
                       )}
                       {gain===null&&<span style={{fontSize:12,color:"#aaa"}}>Measured {s?.pre!=null?"pre only":s?.post!=null?"post only":"—"}</span>}
                     </div>
+                    {isAllProgs&&(
+                      <div style={{marginTop:8,paddingTop:8,borderTop:"1px dashed #e8e8e8",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                        <span style={{fontSize:11,color:"#999",marginRight:2}}>By program:</span>
+                        {Object.entries(perProgramYr).map(([pk,pyr])=>{
+                          const ps=pyr.domainScores?.[k];
+                          if (!ps?.pre||!ps?.post) return null;
+                          const ppg=pctGain(ps.pre,ps.post);
+                          const pgain=+(ps.post-ps.pre).toFixed(2);
+                          return (
+                            <span key={pk} style={{fontSize:11,background:"#f5f5f5",borderRadius:12,padding:"2px 9px",color:"#444",border:"1px solid #e0e0e0"}}>
+                              <strong style={{color:C.G}}>{PROGRAMS[pk]?.label||pk}:</strong>{" "}
+                              <span style={{color:pgain>0?C.G:pgain<0?C.RED:"#888",fontWeight:600}}>
+                                {ppg!=null?(ppg>0?`+${ppg}%`:ppg===0?"0%":`${ppg}%`):`${pgain>0?"+":""}${pgain}`}
+                              </span>
+                              {ps.pctImproved!=null&&<span style={{color:"#888"}}> · {ps.pctImproved}%↑</span>}
+                            </span>
+                          );
+                        }).filter(Boolean)}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1175,7 +1258,7 @@
           {tab==="📈 Trends"&&(
             <>
               <Sec title="Domain Gains by Year (Post − Pre)">
-                <TrendLineChart progData={progData} activeDomains={activeDomains} />
+                <TrendLineChart progData={trendData} activeDomains={activeDomains} />
               </Sec>
               <Sec title="Year-over-Year Summary">
                 <div style={{overflowX:"auto"}}>
@@ -1188,7 +1271,7 @@
                       </tr>
                     </thead>
                     <tbody>
-                      {progData.map((y,i)=>(
+                      {trendData.map((y,i)=>(
                         <tr key={y.year} style={{background:i%2===0?"#fff":C.LIGHT,cursor:"pointer"}}
                           onClick={()=>{setSelYear(y.year);setTab("📊 Overview");}}>
                           <td style={{padding:"6px 9px",fontWeight:700,color:C.G,textAlign:"center"}}>{y.year}</td>
@@ -1214,7 +1297,7 @@
           )}
 
           {tab==="🤝 Relationships"&&(
-            <Sec title={`Relationships — ${PROGRAMS[program]?.label} · ${selYear}`}>
+            <Sec title={`Relationships — ${progLabel} · ${selYear}`}>
               <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:14}}>
                 <Card label="Made New Friends"   value={yr.madeFriendPct!=null?`${yr.madeFriendPct}%`:"—"} accent={C.T}/>
                 <Card label="Sense of Belonging" value={yr.avgBelonging?`${fmtR(yr.avgBelonging)}/7`:"—"} accent={C.G}/>
