@@ -296,26 +296,69 @@
       lia: {
         isLIA: true,
         preStatements: {
-          "can build relationships with others":"connection","knows how make important decisions":"decisionMaking",
-          "can take guidance and make my own":"decisionMaking","set backs don't discourage":"grit",
-          "trust myself when making decisions":"decisionMaking","remain grounded":"perseverance",
-          "think through solutions calmly":"perseverance","work out a difficult problem":"grit",
-          "focus, i can finish":"selfConfidence","when i focus, i can finish":"selfConfidence",
-          "connected to my surroundings":"connection","feel connected to my surroundings":"connection",
-          "work towards specific goals":"selfConfidence","confident in my ability to learn":"selfConfidence",
-          "feel like i can do anything":"selfConfidence","can control my emotions":"perseverance",
-          "like and accept myself":"grit","know how to follow instruction":"direction","not in a rush":"patience",
+          // Q2 — Self-perception (1–7 emoji sliders)
+          "feel good about myself":"selfEsteem",
+          "feel like i can do anything i set my mind to":"selfConfidence",
+          "like and accept myself":"selfEsteem",
+          "stay calm in stressful situations":"perseverance",
+          // Q26 — "Do the following describe you?" (text responses: Very much like me, etc.)
+          "can follow through on something i start":"commitment",
+          "take instruction and apply it":"direction",
+          "generally feels good about themselves":"selfEsteem",
+          "confident that i know what a safe risk":"safeRisk",
+          "feel capable of achieving":"selfConfidence",
+          "feel like i am a strong leader":"leadership",
+          // Q27 — Resilience (1–7)
+          "can control my feelings":"perseverance",
+          "setbacks don't discourage":"grit",
+          "finish whatever i begin":"commitment",
+          "overcome setbacks to complete":"grit",
+          // Q28 — Goals & leadership (1–7)
+          "can make goals for my own performance":"direction",
+          "work towards goals":"direction",
+          "confident in my ability to learn":"selfConfidence",
+          "as a leader, i motivate":"leadership",
+          "communicate well with people":"communication",
+          // Q29 — Guidance & leadership (1–7)
+          "can take guidance and make my own":"decisionMaking",
+          "when i apply myself":"selfConfidence",
+          "know how to follow instruction":"direction",
+          "leadership comes naturally":"leadership",
+          // Q30 — Risk & leadership (1–7)
+          "know what a safe risk":"safeRisk",
+          "challenge myself while still":"safeRisk",
+          "balance risk and reward":"safeRisk",
+          "convince others to follow my lead":"leadership",
         },
         postStatements: {
-          "can build relationships with others":"connection","knows how make important decisions":"decisionMaking",
-          "can take guidance and make my own":"decisionMaking","set backs don't discourage":"grit",
-          "trust myself when making decisions":"decisionMaking","remain grounded":"perseverance",
-          "think through solutions calmly":"perseverance","work out a difficult problem":"grit",
-          "focus, i can finish":"selfConfidence","when i focus, i can finish":"selfConfidence",
-          "connected to my surroundings":"connection","feel connected to my surroundings":"connection",
-          "work toward specific goals":"selfConfidence","confident in my ability to learn":"selfConfidence",
-          "feel like i can do anything":"selfConfidence","can control my emotions":"perseverance",
-          "like and accept myself":"grit","know how to follow instruction":"direction","not in a rush":"patience",
+          // Mid-way survey has identical questions to pre-survey
+          "feel good about myself":"selfEsteem",
+          "feel like i can do anything i set my mind to":"selfConfidence",
+          "like and accept myself":"selfEsteem",
+          "stay calm in stressful situations":"perseverance",
+          "can follow through on something i start":"commitment",
+          "take instruction and apply it":"direction",
+          "generally feels good about themselves":"selfEsteem",
+          "confident that i know what a safe risk":"safeRisk",
+          "feel capable of achieving":"selfConfidence",
+          "feel like i am a strong leader":"leadership",
+          "can control my feelings":"perseverance",
+          "setbacks don't discourage":"grit",
+          "finish whatever i begin":"commitment",
+          "overcome setbacks to complete":"grit",
+          "can make goals for my own performance":"direction",
+          "work towards goals":"direction",
+          "confident in my ability to learn":"selfConfidence",
+          "as a leader, i motivate":"leadership",
+          "communicate well with people":"communication",
+          "can take guidance and make my own":"decisionMaking",
+          "when i apply myself":"selfConfidence",
+          "know how to follow instruction":"direction",
+          "leadership comes naturally":"leadership",
+          "know what a safe risk":"safeRisk",
+          "challenge myself while still":"safeRisk",
+          "balance risk and reward":"safeRisk",
+          "convince others to follow my lead":"leadership",
         },
       },
     };
@@ -329,7 +372,7 @@
       gag: { label:"Get a Grip",        activity:"rock climbing",   preId:"221085730522246", postId:"221086031429247" },
       tah: { label:"Take a Hike",       activity:"hiking",          preId:"220945019792259", postId:"221235397521251" },
       rtr: { label:"Ready to Roll",     activity:"skateboarding",   preId:"242606915644258", postId:"242906743772262" },
-      lia: { label:"Leaders in Action", activity:"multi-activity",  preId:"222565881985270", postId:"211615255085048" },
+      lia: { label:"Leaders in Action", activity:"multi-activity",  preId:"222565881985270", postId:"213336384814255" },
     };
 
     const FETCH_TIMEOUT_MS = 45000;
@@ -343,6 +386,17 @@
     const relMap = {"We are acquaintances":1,"We are friendly":2,"We are close":3,"We are very close":4,"We are very close, like best friends":4};
     const relScore = (v) => relMap[v]||0;
     const relLabel = (v) => v>=3.5?"Very close":v>=2.5?"Close":v>=1.5?"Friendly":"Acquaintances";
+
+    const textScoreMap = {
+      "very much like me":7, "mostly like me":6, "like me":5, "somewhat like me":4,
+      "a little like me":3, "not really like me":2, "not like me at all":1, "not at all like me":1,
+    };
+    function textToScore(val) {
+      const lc = String(val).toLowerCase().replace(/[\[\]"\\]/g,"").trim();
+      for (const [text, score] of Object.entries(textScoreMap))
+        if (lc.includes(text)) return score;
+      return NaN;
+    }
 
     function matchDomain(rowLabel, stmtMap) {
       const lc = rowLabel.toLowerCase();
@@ -358,7 +412,8 @@
         if (!ans || typeof ans !== "object" || Array.isArray(ans)) continue;
         for (const [rowLabel, score] of Object.entries(ans)) {
           const domain = matchDomain(rowLabel, stmtMap);
-          const num = parseFloat(score);
+          let num = parseFloat(score);
+          if (isNaN(num)) num = textToScore(score);
           if (domain && !isNaN(num) && num > 0) {
             if (!buckets[domain]) buckets[domain] = [];
             buckets[domain].push(num);
@@ -503,7 +558,7 @@
         gag:["selfConfidence","selfEsteem","grit","direction","safeRisk","copingFailure","communication","trust","learningSteps"],
         tah:["selfEsteem","grit","direction","connection","decisionMaking"],
         rtr:["selfConfidence","perseverance","grit","direction","patience"],
-        lia:["selfConfidence","perseverance","grit","direction","patience","connection","decisionMaking"],
+        lia:["selfConfidence","selfEsteem","perseverance","grit","direction","commitment","communication","decisionMaking","safeRisk","leadership"],
       };
       const ds2 = domainSets[progKey]||["selfConfidence","grit","direction"];
       return years.map((yr,i)=>{
