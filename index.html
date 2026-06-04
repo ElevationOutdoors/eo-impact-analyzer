@@ -506,11 +506,29 @@
         const feltUnsafe   = safetyAns.some(v=>v.toLowerCase().startsWith("no"))?0:1;
         const leaderUnsafe = safetyAns.filter(v=>v.toLowerCase().startsWith("no")).length>=2?0:1;
         let quote="", quoteConsent=false;
-        for (const [,qval] of Object.entries(a)) {
-          if (typeof qval?.answer==="string"&&qval.answer.length>40&&!qval.answer.match(/^\d/)) { quote=qval.answer; break; }
+        // Try to find the quote by matching known question name keywords first
+        for (const [key,qval] of Object.entries(a)) {
+          const fn=((qval?.name||String(key))).toLowerCase();
+          const ans=qval?.answer;
+          if (typeof ans==="string"&&ans.length>10&&(fn.includes("experience")||fn.includes("share")||fn.includes("tell us")||fn.includes("describe")||fn.includes("highlight")||fn.includes("moment")||fn.includes("quote")||fn.includes("words")||fn.includes("feedback"))) { quote=ans; break; }
         }
-        for (const [,qval] of Object.entries(a)) {
-          if (typeof qval?.answer==="string"&&qval.answer.toUpperCase()==="YES") { quoteConsent=true; break; }
+        // Fallback: any long string not starting with a digit
+        if (!quote) {
+          for (const [,qval] of Object.entries(a)) {
+            if (typeof qval?.answer==="string"&&qval.answer.length>40&&!qval.answer.match(/^\d/)) { quote=qval.answer; break; }
+          }
+        }
+        // Try to find consent by matching question name keywords first
+        for (const [key,qval] of Object.entries(a)) {
+          const fn=((qval?.name||String(key))).toLowerCase();
+          const ans=qval?.answer;
+          if (typeof ans==="string"&&(fn.includes("permission")||fn.includes("consent")||fn.includes("use your")||fn.includes("may we")||fn.includes("quote"))&&ans.toLowerCase().startsWith("yes")) { quoteConsent=true; break; }
+        }
+        // Fallback: any exact "YES" answer
+        if (!quoteConsent) {
+          for (const [,qval] of Object.entries(a)) {
+            if (typeof qval?.answer==="string"&&qval.answer.toUpperCase()==="YES") { quoteConsent=true; break; }
+          }
         }
         return { ...domains, ...rel, madeFriend, belonging, overallRating, feltUnsafe, leaderUnsafe, quote, quoteConsent };
       });
@@ -840,8 +858,11 @@
         const headers = lines[0].split(",").map(h=>h.replace(/"/g,"").trim());
         return lines.slice(1).filter(l=>l.trim()).map(line=>{
           const vals = line.split(",").map(v=>v.replace(/"/g,"").trim());
-          const obj = {}; headers.forEach((h,i)=>obj[h]=vals[i]||"");
-          return { subtitle: obj["Submit Date"]||obj["Date"]||obj["submit_date"]||"2024-01-01", submission_answers: obj };
+          // Normalize into {answer, name} objects so aggregateYear can read them
+          const submission_answers = {};
+          headers.forEach((h,i)=>{ submission_answers[h]={answer:vals[i]||"",name:h}; });
+          const dt = submission_answers["Submit Date"]?.answer||submission_answers["Date"]?.answer||submission_answers["submit_date"]?.answer||"2024-01-01";
+          return { subtitle: dt, submission_answers };
         });
       }
 
